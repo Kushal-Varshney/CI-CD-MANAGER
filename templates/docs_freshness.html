@@ -97,7 +97,9 @@
 
     <div class="card">
         <form method="post">
-            <input type="text" name="repo" placeholder="owner/repo (e.g. facebook/react)" required value="{{ repo or '' }}">
+            <input type="text" name="repo" placeholder="GitHub repo (e.g. facebook/react)" value="{{ repo or '' }}">
+            <div style="display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0; color: var(--text-muted); font-size: 0.8rem;"><div style="flex:1; height:1px; background: var(--card-border);"></div>OR<div style="flex:1; height:1px; background: var(--card-border);"></div></div>
+            <input type="text" name="local_path" placeholder="Local path (e.g. /Users/you/projects/my-app)" value="">
             <button type="submit">⚡ Scan Documentation</button>
         </form>
     </div>

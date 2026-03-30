@@ -410,91 +410,151 @@ def view_run(run_id):
 @login_required
 def coverage_scan():
     from analysis import analyze_coverage_gaps
-    from github_api import fetch_code_structure
     result = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
-        structure = fetch_code_structure(repo, token)
-        result = analyze_coverage_gaps(structure)
-    return render_template('coverage.html', result=result, repo=repo)
+        local_path = request.form.get('local_path', '').strip()
+        if local_path:
+            from local_scanner import scan_local_code_structure
+            structure = scan_local_code_structure(local_path)
+            result = analyze_coverage_gaps(structure)
+            scan_source = local_path
+        elif repo:
+            from github_api import fetch_code_structure
+            token = current_user.github_token or ''
+            structure = fetch_code_structure(repo, token)
+            result = analyze_coverage_gaps(structure)
+            scan_source = repo
+    return render_template('coverage.html', result=result, repo=scan_source or repo)
 
 @app.route('/pr-analysis', methods=['GET', 'POST'])
 @login_required
 def pr_analysis():
     from analysis import score_pr_complexity
-    from github_api import fetch_pr_details
     result = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
-        prs = fetch_pr_details(repo, token)
-        result = score_pr_complexity(prs)
-    return render_template('pr_analysis.html', result=result, repo=repo)
+        local_path = request.form.get('local_path', '').strip()
+        if local_path:
+            from local_scanner import scan_local_prs
+            prs = scan_local_prs(local_path)
+            result = score_pr_complexity(prs)
+            scan_source = local_path
+        elif repo:
+            from github_api import fetch_pr_details
+            token = current_user.github_token or ''
+            prs = fetch_pr_details(repo, token)
+            result = score_pr_complexity(prs)
+            scan_source = repo
+    return render_template('pr_analysis.html', result=result, repo=scan_source or repo)
 
 @app.route('/onboarding', methods=['GET', 'POST'])
 @login_required
 def onboarding():
     from analysis import score_onboarding
-    from github_api import fetch_onboarding_files
     result = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
-        files = fetch_onboarding_files(repo, token)
-        result = score_onboarding(files)
-    return render_template('onboarding.html', result=result, repo=repo)
+        local_path = request.form.get('local_path', '').strip()
+        if local_path:
+            from local_scanner import scan_local_onboarding
+            files = scan_local_onboarding(local_path)
+            result = score_onboarding(files)
+            scan_source = local_path
+        elif repo:
+            from github_api import fetch_onboarding_files
+            token = current_user.github_token or ''
+            files = fetch_onboarding_files(repo, token)
+            result = score_onboarding(files)
+            scan_source = repo
+    return render_template('onboarding.html', result=result, repo=scan_source or repo)
 
 @app.route('/commit-patterns', methods=['GET', 'POST'])
 @login_required
 def commit_patterns():
     from analysis import analyze_commit_health
-    from github_api import fetch_commit_patterns
     result = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
-        commits = fetch_commit_patterns(repo, token)
-        result = analyze_commit_health(commits)
-    return render_template('commit_patterns.html', result=result, repo=repo)
+        local_path = request.form.get('local_path', '').strip()
+        if local_path:
+            from local_scanner import scan_local_commits
+            commits = scan_local_commits(local_path)
+            result = analyze_commit_health(commits)
+            scan_source = local_path
+        elif repo:
+            from github_api import fetch_commit_patterns
+            token = current_user.github_token or ''
+            commits = fetch_commit_patterns(repo, token)
+            result = analyze_commit_health(commits)
+            scan_source = repo
+    return render_template('commit_patterns.html', result=result, repo=scan_source or repo)
 
 @app.route('/env-check', methods=['GET', 'POST'])
 @login_required
 def env_check():
     from analysis import detect_env_drift
-    from github_api import fetch_env_files
     result = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
-        env_data = fetch_env_files(repo, token)
-        result = detect_env_drift(env_data)
-    return render_template('env_check.html', result=result, repo=repo)
+        local_path = request.form.get('local_path', '').strip()
+        if local_path:
+            from local_scanner import scan_local_env
+            env_data = scan_local_env(local_path)
+            result = detect_env_drift(env_data)
+            scan_source = local_path
+        elif repo:
+            from github_api import fetch_env_files
+            token = current_user.github_token or ''
+            env_data = fetch_env_files(repo, token)
+            result = detect_env_drift(env_data)
+            scan_source = repo
+    return render_template('env_check.html', result=result, repo=scan_source or repo)
 
 @app.route('/repo-health', methods=['GET', 'POST'])
 @login_required
 def repo_health():
     from analysis import analyze_coverage_gaps, score_onboarding, analyze_commit_health, detect_env_drift, analyze_security_patterns
-    from github_api import fetch_code_structure, fetch_onboarding_files, fetch_commit_patterns, fetch_env_files, fetch_dora_metrics, fetch_docs_freshness, fetch_security_scan
     
     results = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
+        local_path = request.form.get('local_path', '').strip()
         
-        coverage = analyze_coverage_gaps(fetch_code_structure(repo, token))
-        onboarding_score = score_onboarding(fetch_onboarding_files(repo, token))
-        commit_health = analyze_commit_health(fetch_commit_patterns(repo, token))
-        env_drift = detect_env_drift(fetch_env_files(repo, token))
-        dora = fetch_dora_metrics(repo, token)
-        docs = fetch_docs_freshness(repo, token)
-        security = analyze_security_patterns(fetch_security_scan(repo, token))
+        if local_path:
+            from local_scanner import scan_local_code_structure, scan_local_onboarding, scan_local_commits, scan_local_env, scan_local_docs_freshness
+            scan_source = local_path
+            coverage = analyze_coverage_gaps(scan_local_code_structure(local_path))
+            onboarding_score = score_onboarding(scan_local_onboarding(local_path))
+            commit_health = analyze_commit_health(scan_local_commits(local_path))
+            env_drift = detect_env_drift(scan_local_env(local_path))
+            docs_result = scan_local_docs_freshness(local_path)
+            docs = docs_result['score'] if docs_result else None
+            security = []
+            dora = None
+        else:
+            from github_api import fetch_code_structure, fetch_onboarding_files, fetch_commit_patterns, fetch_env_files, fetch_dora_metrics, fetch_docs_freshness, fetch_security_scan
+            scan_source = repo
+            token = current_user.github_token or ''
+            coverage = analyze_coverage_gaps(fetch_code_structure(repo, token))
+            onboarding_score = score_onboarding(fetch_onboarding_files(repo, token))
+            commit_health = analyze_commit_health(fetch_commit_patterns(repo, token))
+            env_drift = detect_env_drift(fetch_env_files(repo, token))
+            dora = fetch_dora_metrics(repo, token)
+            docs = fetch_docs_freshness(repo, token)
+            security = analyze_security_patterns(fetch_security_scan(repo, token))
         
         # Calculate overall health score
         scores = []
@@ -521,19 +581,27 @@ def repo_health():
             'security': security
         }
     
-    return render_template('repo_health.html', results=results, repo=repo)
+    return render_template('repo_health.html', results=results, repo=scan_source or repo)
 
 @app.route('/docs-freshness', methods=['GET', 'POST'])
 @login_required
 def docs_freshness():
-    from github_api import fetch_docs_freshness_full
     result = None
     repo = None
+    scan_source = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
-        token = current_user.github_token or ''
-        result = fetch_docs_freshness_full(repo, token)
-    return render_template('docs_freshness.html', result=result, repo=repo)
+        local_path = request.form.get('local_path', '').strip()
+        if local_path:
+            from local_scanner import scan_local_docs_freshness
+            result = scan_local_docs_freshness(local_path)
+            scan_source = local_path
+        elif repo:
+            from github_api import fetch_docs_freshness_full
+            token = current_user.github_token or ''
+            result = fetch_docs_freshness_full(repo, token)
+            scan_source = repo
+    return render_template('docs_freshness.html', result=result, repo=scan_source or repo)
 
 # ---------------- INITIALIZATION ----------------
 with app.app_context():
