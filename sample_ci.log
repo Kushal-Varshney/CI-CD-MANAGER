@@ -1,37 +1,8 @@
-2024-03-15T10:00:01Z ##[group]Run actions/checkout@v4
-2024-03-15T10:00:03Z Syncing repository: facebook/react
-2024-03-15T10:00:08Z ##[endgroup]
-2024-03-15T10:00:08Z ##[group]Run actions/setup-node@v4
-2024-03-15T10:00:12Z Setting up Node.js 18.x
-2024-03-15T10:00:18Z ##[endgroup]
-2024-03-15T10:00:18Z ##[group]Run npm ci
-2024-03-15T10:00:18Z Installing dependencies...
-2024-03-15T10:01:45Z npm warn deprecated inflight@1.0.6
-2024-03-15T10:01:46Z npm warn deprecated glob@7.2.3
-2024-03-15T10:02:55Z added 1847 packages in 157s
-2024-03-15T10:02:55Z ##[endgroup]
-2024-03-15T10:02:55Z ##[group]Run npm run lint
-2024-03-15T10:02:55Z Running ESLint...
-2024-03-15T10:03:40Z ✓ No lint errors found
-2024-03-15T10:03:40Z ##[endgroup]
-2024-03-15T10:03:40Z ##[group]Run npm run build
-2024-03-15T10:03:40Z Building React packages...
-2024-03-15T10:03:42Z Building react...
-2024-03-15T10:04:15Z Building react-dom...
-2024-03-15T10:05:30Z Building react-server...
-2024-03-15T10:06:10Z Build completed successfully
-2024-03-15T10:06:10Z ##[endgroup]
-2024-03-15T10:06:10Z ##[group]Run npm test
-2024-03-15T10:06:10Z Running test suites...
-2024-03-15T10:06:12Z PASS packages/react/src/__tests__/React-test.js (3.2s)
-2024-03-15T10:06:25Z PASS packages/react-dom/src/__tests__/ReactDOM-test.js (12.8s)
-2024-03-15T10:07:45Z PASS packages/react-reconciler/src/__tests__/ReactFiber-test.js (45.2s)
-2024-03-15T10:09:20Z PASS packages/scheduler/src/__tests__/Scheduler-test.js (22.1s)
-2024-03-15T10:10:05Z Tests: 847 passed, 847 total
-2024-03-15T10:10:05Z Time: 235.4s
-2024-03-15T10:10:05Z ##[endgroup]
-2024-03-15T10:10:05Z ##[group]Run npm run deploy-preview
-2024-03-15T10:10:05Z Deploying to staging...
-2024-03-15T10:10:35Z Upload complete
-2024-03-15T10:10:40Z Preview URL: https://preview-abc123.vercel.app
-2024-03-15T10:10:40Z ##[endgroup]
+STEP: Checkout Code | TIME: 5s | STATUS: PASSED
+STEP: Setup Node.js | TIME: 10s | STATUS: PASSED
+STEP: Install Dependencies (npm ci) | TIME: 157s | STATUS: PASSED
+STEP: Run ESLint | TIME: 45s | STATUS: PASSED
+STEP: Build React Packages | TIME: 150s | STATUS: PASSED
+STEP: Execute Test Suite | TIME: 235s | STATUS: PASSED
+STEP: Deploy Preview | TIME: 35s | STATUS: PASSED
+STEP: Security Audit | TIME: 12s | STATUS: FAILED

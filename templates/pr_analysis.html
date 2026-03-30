@@ -87,13 +87,25 @@
     </div>
 
     <div class="card">
-        <form method="post">
+        <form method="post" style="text-align:center;">
             <input type="text" name="repo" placeholder="GitHub repo (e.g. facebook/react)" value="{{ repo or '' }}">
             <div style="display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0; color: var(--text-muted); font-size: 0.8rem;"><div style="flex:1; height:1px; background: var(--card-border);"></div>OR<div style="flex:1; height:1px; background: var(--card-border);"></div></div>
-            <input type="text" name="local_path" placeholder="Local path (e.g. /Users/you/projects/my-app)" value="">
+            <input type="hidden" name="local_path" id="local_path" value="">
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button type="button" onclick="browseFolder()" style="flex:1; padding:0.7rem; border-radius:10px; border:1px dashed rgba(168,85,247,0.4); background:rgba(168,85,247,0.08); color:#c084fc; font-weight:600; cursor:pointer; transition:all 0.3s; font-size:0.9rem;" onmouseover="this.style.background='rgba(168,85,247,0.15)';this.style.borderColor='rgba(168,85,247,0.6)'" onmouseout="this.style.background='rgba(168,85,247,0.08)';this.style.borderColor='rgba(168,85,247,0.4)'">📂 Browse Local Folder</button>
+            </div>
+            <div id="selected-path" style="display:none; margin-top:0.4rem; padding:0.5rem 0.75rem; border-radius:8px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); color:#10b981; font-size:0.8rem; word-break:break-all;"></div>
             <button type="submit">⚡ Analyze Pull Requests</button>
         </form>
     </div>
+
+    {% if error %}
+    <div class="card" style="border-left: 4px solid var(--danger);">
+        <h2 style="color: var(--danger);">⚠️ Scan Error</h2>
+        <p style="color: #cbd5e1; line-height: 1.6; margin-bottom: 1rem;">{{ error }}</p>
+        <a href="/settings" style="display: inline-block; padding: 0.5rem 1rem; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); color: var(--primary); border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600;">⚙️ Add GitHub Token in Settings</a>
+    </div>
+    {% endif %}
 
     {% if result %}
     <div class="card">
@@ -127,5 +139,17 @@
     {% endif %}
     </main>
 </div>
+<script>
+function browseFolder() {
+    fetch('/api/browse-folder').then(r => r.json()).then(data => {
+        if (data.path) {
+            document.getElementById('local_path').value = data.path;
+            const el = document.getElementById('selected-path');
+            el.style.display = 'block';
+            el.textContent = '✅ Selected: ' + data.path;
+        }
+    }).catch(() => alert('Could not open folder picker'));
+}
+</script>
 </body>
 </html>

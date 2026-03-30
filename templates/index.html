@@ -672,6 +672,23 @@
     </div>
     {% endif %}
 
+    {% if error %}
+    <div class="card" style="border-left: 4px solid var(--danger); animation: cardEnter 0.5s ease-out both;">
+        <h2 style="color: var(--danger); display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.5rem;">⚠️</span> Scan Error
+        </h2>
+        <p style="color: #cbd5e1; line-height: 1.6; margin-bottom: 1rem;">{{ error }}</p>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <a href="/settings" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: var(--primary); border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.3s;">
+                ⚙️ Go to Settings
+            </a>
+            <a href="/" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); color: var(--text-muted); border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.3s;">
+                🔄 Try Again
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
     {% if steps %}
     <div class="card results">
         <h2>Analysis Results</h2>

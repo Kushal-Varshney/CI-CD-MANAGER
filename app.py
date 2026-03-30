@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import os
 
@@ -88,6 +88,11 @@ def index():
     source = None
     name = None
     dep_text = None
+    dora_avg = None
+    docs_drift = None
+    flaky_tests = []
+    security_yaml = None
+    github_error = None
 
     # FILE UPLOAD
     if request.method == 'POST' and 'logfile' in request.files:
@@ -107,7 +112,7 @@ def index():
         if not token and current_user.github_token:
             token = current_user.github_token
 
-        steps = fetch_github_runs(repo, token)
+        steps, github_error = fetch_github_runs(repo, token)
         dep_text = fetch_repository_dependencies(repo, token)
         dora_avg = fetch_dora_metrics(repo, token)
         docs_drift = fetch_docs_freshness(repo, token)
@@ -148,7 +153,8 @@ def index():
             flaky_tests=[],
             security_findings=[],
             cost_estimate=None,
-            failure_predictions=[]
+            failure_predictions=[],
+            error=github_error
         )
 
     total, slowest, failed, suggestions, score, score_explain = analyze_pipeline(steps)
@@ -251,7 +257,8 @@ def index():
         flaky_tests=flaky_data,
         security_findings=security_findings,
         cost_estimate=cost_estimate,
-        failure_predictions=[]
+        failure_predictions=[],
+        error=None
     )
 
 @app.route('/download-fix/<int:run_id>')
@@ -413,21 +420,28 @@ def coverage_scan():
     result = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
-        if local_path:
-            from local_scanner import scan_local_code_structure
-            structure = scan_local_code_structure(local_path)
-            result = analyze_coverage_gaps(structure)
-            scan_source = local_path
-        elif repo:
-            from github_api import fetch_code_structure
-            token = current_user.github_token or ''
-            structure = fetch_code_structure(repo, token)
-            result = analyze_coverage_gaps(structure)
-            scan_source = repo
-    return render_template('coverage.html', result=result, repo=scan_source or repo)
+        try:
+            if local_path:
+                from local_scanner import scan_local_code_structure
+                structure = scan_local_code_structure(local_path)
+                result = analyze_coverage_gaps(structure)
+                scan_source = local_path
+            elif repo:
+                from github_api import fetch_code_structure
+                token = current_user.github_token or ''
+                structure = fetch_code_structure(repo, token)
+                if structure is None:
+                    error = f"Could not fetch code structure for '{repo}'. This may be due to GitHub API rate limiting. Add a GitHub token in Settings to increase your API limit."
+                else:
+                    result = analyze_coverage_gaps(structure)
+                scan_source = repo
+        except Exception as e:
+            error = f"Scan failed: {str(e)}"
+    return render_template('coverage.html', result=result, repo=scan_source or repo, error=error)
 
 @app.route('/pr-analysis', methods=['GET', 'POST'])
 @login_required
@@ -436,21 +450,28 @@ def pr_analysis():
     result = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
-        if local_path:
-            from local_scanner import scan_local_prs
-            prs = scan_local_prs(local_path)
-            result = score_pr_complexity(prs)
-            scan_source = local_path
-        elif repo:
-            from github_api import fetch_pr_details
-            token = current_user.github_token or ''
-            prs = fetch_pr_details(repo, token)
-            result = score_pr_complexity(prs)
-            scan_source = repo
-    return render_template('pr_analysis.html', result=result, repo=scan_source or repo)
+        try:
+            if local_path:
+                from local_scanner import scan_local_prs
+                prs = scan_local_prs(local_path)
+                result = score_pr_complexity(prs)
+                scan_source = local_path
+            elif repo:
+                from github_api import fetch_pr_details
+                token = current_user.github_token or ''
+                prs = fetch_pr_details(repo, token)
+                if not prs:
+                    error = f"No PR data found for '{repo}'. This may be due to GitHub API rate limiting or no closed PRs exist. Add a GitHub token in Settings."
+                else:
+                    result = score_pr_complexity(prs)
+                scan_source = repo
+        except Exception as e:
+            error = f"Scan failed: {str(e)}"
+    return render_template('pr_analysis.html', result=result, repo=scan_source or repo, error=error)
 
 @app.route('/onboarding', methods=['GET', 'POST'])
 @login_required
@@ -459,21 +480,25 @@ def onboarding():
     result = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
-        if local_path:
-            from local_scanner import scan_local_onboarding
-            files = scan_local_onboarding(local_path)
-            result = score_onboarding(files)
-            scan_source = local_path
-        elif repo:
-            from github_api import fetch_onboarding_files
-            token = current_user.github_token or ''
-            files = fetch_onboarding_files(repo, token)
-            result = score_onboarding(files)
-            scan_source = repo
-    return render_template('onboarding.html', result=result, repo=scan_source or repo)
+        try:
+            if local_path:
+                from local_scanner import scan_local_onboarding
+                files = scan_local_onboarding(local_path)
+                result = score_onboarding(files)
+                scan_source = local_path
+            elif repo:
+                from github_api import fetch_onboarding_files
+                token = current_user.github_token or ''
+                files = fetch_onboarding_files(repo, token)
+                result = score_onboarding(files)
+                scan_source = repo
+        except Exception as e:
+            error = f"Scan failed: {str(e)}"
+    return render_template('onboarding.html', result=result, repo=scan_source or repo, error=error)
 
 @app.route('/commit-patterns', methods=['GET', 'POST'])
 @login_required
@@ -482,21 +507,28 @@ def commit_patterns():
     result = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
-        if local_path:
-            from local_scanner import scan_local_commits
-            commits = scan_local_commits(local_path)
-            result = analyze_commit_health(commits)
-            scan_source = local_path
-        elif repo:
-            from github_api import fetch_commit_patterns
-            token = current_user.github_token or ''
-            commits = fetch_commit_patterns(repo, token)
-            result = analyze_commit_health(commits)
-            scan_source = repo
-    return render_template('commit_patterns.html', result=result, repo=scan_source or repo)
+        try:
+            if local_path:
+                from local_scanner import scan_local_commits
+                commits = scan_local_commits(local_path)
+                result = analyze_commit_health(commits)
+                scan_source = local_path
+            elif repo:
+                from github_api import fetch_commit_patterns
+                token = current_user.github_token or ''
+                commits = fetch_commit_patterns(repo, token)
+                if not commits:
+                    error = f"No commit data found for '{repo}'. This may be due to GitHub API rate limiting. Add a GitHub token in Settings."
+                else:
+                    result = analyze_commit_health(commits)
+                scan_source = repo
+        except Exception as e:
+            error = f"Scan failed: {str(e)}"
+    return render_template('commit_patterns.html', result=result, repo=scan_source or repo, error=error)
 
 @app.route('/env-check', methods=['GET', 'POST'])
 @login_required
@@ -505,21 +537,25 @@ def env_check():
     result = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
-        if local_path:
-            from local_scanner import scan_local_env
-            env_data = scan_local_env(local_path)
-            result = detect_env_drift(env_data)
-            scan_source = local_path
-        elif repo:
-            from github_api import fetch_env_files
-            token = current_user.github_token or ''
-            env_data = fetch_env_files(repo, token)
-            result = detect_env_drift(env_data)
-            scan_source = repo
-    return render_template('env_check.html', result=result, repo=scan_source or repo)
+        try:
+            if local_path:
+                from local_scanner import scan_local_env
+                env_data = scan_local_env(local_path)
+                result = detect_env_drift(env_data)
+                scan_source = local_path
+            elif repo:
+                from github_api import fetch_env_files
+                token = current_user.github_token or ''
+                env_data = fetch_env_files(repo, token)
+                result = detect_env_drift(env_data)
+                scan_source = repo
+        except Exception as e:
+            error = f"Scan failed: {str(e)}"
+    return render_template('env_check.html', result=result, repo=scan_source or repo, error=error)
 
 @app.route('/repo-health', methods=['GET', 'POST'])
 @login_required
@@ -529,59 +565,63 @@ def repo_health():
     results = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
         
-        if local_path:
-            from local_scanner import scan_local_code_structure, scan_local_onboarding, scan_local_commits, scan_local_env, scan_local_docs_freshness
-            scan_source = local_path
-            coverage = analyze_coverage_gaps(scan_local_code_structure(local_path))
-            onboarding_score = score_onboarding(scan_local_onboarding(local_path))
-            commit_health = analyze_commit_health(scan_local_commits(local_path))
-            env_drift = detect_env_drift(scan_local_env(local_path))
-            docs_result = scan_local_docs_freshness(local_path)
-            docs = docs_result['score'] if docs_result else None
-            security = []
-            dora = None
-        else:
-            from github_api import fetch_code_structure, fetch_onboarding_files, fetch_commit_patterns, fetch_env_files, fetch_dora_metrics, fetch_docs_freshness, fetch_security_scan
-            scan_source = repo
-            token = current_user.github_token or ''
-            coverage = analyze_coverage_gaps(fetch_code_structure(repo, token))
-            onboarding_score = score_onboarding(fetch_onboarding_files(repo, token))
-            commit_health = analyze_commit_health(fetch_commit_patterns(repo, token))
-            env_drift = detect_env_drift(fetch_env_files(repo, token))
-            dora = fetch_dora_metrics(repo, token)
-            docs = fetch_docs_freshness(repo, token)
-            security = analyze_security_patterns(fetch_security_scan(repo, token))
-        
-        # Calculate overall health score
-        scores = []
-        if onboarding_score:
-            scores.append(onboarding_score['score'])
-        if coverage:
-            scores.append(min(coverage['test_ratio'] * 2, 100))
-        if commit_health:
-            bus_score = min(commit_health['bus_factor'] * 20, 100)
-            scores.append(bus_score)
-        
-        overall = round(sum(scores) / len(scores)) if scores else 0
-        grade = 'A' if overall >= 80 else 'B' if overall >= 60 else 'C' if overall >= 40 else 'D' if overall >= 20 else 'F'
-        
-        results = {
-            'overall_score': overall,
-            'grade': grade,
-            'coverage': coverage,
-            'onboarding': onboarding_score,
-            'commit_health': commit_health,
-            'env_drift': env_drift,
-            'dora': dora,
-            'docs_drift': docs,
-            'security': security
-        }
+        try:
+            if local_path:
+                from local_scanner import scan_local_code_structure, scan_local_onboarding, scan_local_commits, scan_local_env, scan_local_docs_freshness
+                scan_source = local_path
+                coverage = analyze_coverage_gaps(scan_local_code_structure(local_path))
+                onboarding_score = score_onboarding(scan_local_onboarding(local_path))
+                commit_health = analyze_commit_health(scan_local_commits(local_path))
+                env_drift = detect_env_drift(scan_local_env(local_path))
+                docs_result = scan_local_docs_freshness(local_path)
+                docs = docs_result['score'] if docs_result else None
+                security = []
+                dora = None
+            else:
+                from github_api import fetch_code_structure, fetch_onboarding_files, fetch_commit_patterns, fetch_env_files, fetch_dora_metrics, fetch_docs_freshness, fetch_security_scan
+                scan_source = repo
+                token = current_user.github_token or ''
+                coverage = analyze_coverage_gaps(fetch_code_structure(repo, token))
+                onboarding_score = score_onboarding(fetch_onboarding_files(repo, token))
+                commit_health = analyze_commit_health(fetch_commit_patterns(repo, token))
+                env_drift = detect_env_drift(fetch_env_files(repo, token))
+                dora = fetch_dora_metrics(repo, token)
+                docs = fetch_docs_freshness(repo, token)
+                security = analyze_security_patterns(fetch_security_scan(repo, token))
+            
+            # Calculate overall health score
+            scores = []
+            if onboarding_score:
+                scores.append(onboarding_score['score'])
+            if coverage:
+                scores.append(min(coverage['test_ratio'] * 2, 100))
+            if commit_health:
+                bus_score = min(commit_health['bus_factor'] * 20, 100)
+                scores.append(bus_score)
+            
+            overall = round(sum(scores) / len(scores)) if scores else 0
+            grade = 'A' if overall >= 80 else 'B' if overall >= 60 else 'C' if overall >= 40 else 'D' if overall >= 20 else 'F'
+            
+            results = {
+                'overall_score': overall,
+                'grade': grade,
+                'coverage': coverage,
+                'onboarding': onboarding_score,
+                'commit_health': commit_health,
+                'env_drift': env_drift,
+                'dora': dora,
+                'docs_drift': docs,
+                'security': security
+            }
+        except Exception as e:
+            error = f"Full scan failed: {str(e)}. This may be due to GitHub API rate limiting. Add a GitHub token in Settings to increase your API limit."
     
-    return render_template('repo_health.html', results=results, repo=scan_source or repo)
+    return render_template('repo_health.html', results=results, repo=scan_source or repo, error=error)
 
 @app.route('/docs-freshness', methods=['GET', 'POST'])
 @login_required
@@ -589,19 +629,43 @@ def docs_freshness():
     result = None
     repo = None
     scan_source = None
+    error = None
     if request.method == 'POST':
         repo = request.form.get('repo', '')
         local_path = request.form.get('local_path', '').strip()
-        if local_path:
-            from local_scanner import scan_local_docs_freshness
-            result = scan_local_docs_freshness(local_path)
-            scan_source = local_path
-        elif repo:
-            from github_api import fetch_docs_freshness_full
-            token = current_user.github_token or ''
-            result = fetch_docs_freshness_full(repo, token)
-            scan_source = repo
-    return render_template('docs_freshness.html', result=result, repo=scan_source or repo)
+        try:
+            if local_path:
+                from local_scanner import scan_local_docs_freshness
+                result = scan_local_docs_freshness(local_path)
+                scan_source = local_path
+            elif repo:
+                from github_api import fetch_docs_freshness_full
+                token = current_user.github_token or ''
+                result = fetch_docs_freshness_full(repo, token)
+                if result is None:
+                    error = f"Could not fetch docs data for '{repo}'. This may be due to GitHub API rate limiting. Add a GitHub token in Settings."
+                scan_source = repo
+        except Exception as e:
+            error = f"Scan failed: {str(e)}"
+    return render_template('docs_freshness.html', result=result, repo=scan_source or repo, error=error)
+
+# ---------- FOLDER BROWSER API ----------
+@app.route('/api/browse-folder')
+@login_required
+def browse_folder():
+    """Opens native macOS folder picker and returns the selected path."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['osascript', '-e', 'POSIX path of (choose folder with prompt "Select project folder to scan")'],
+            capture_output=True, text=True, timeout=60
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            path = result.stdout.strip().rstrip('/')
+            return jsonify({'path': path})
+        return jsonify({'path': '', 'error': 'No folder selected'})
+    except Exception as e:
+        return jsonify({'path': '', 'error': str(e)})
 
 # ---------------- INITIALIZATION ----------------
 with app.app_context():

@@ -2,19 +2,47 @@ import requests
 import base64
 from datetime import datetime
 
+
+def _check_github_response(r, context="GitHub API"):
+    """Check a GitHub API response for errors. Returns (ok, error_message)."""
+    if r.status_code == 403:
+        remaining = r.headers.get('X-RateLimit-Remaining', '?')
+        msg = r.json().get('message', 'Forbidden')
+        if 'rate limit' in msg.lower():
+            return False, f"GitHub API rate limit exceeded. You have {remaining} requests remaining. Please add a GitHub Personal Access Token in Settings (or in the token field) to get 5,000 requests/hour."
+        return False, f"GitHub API access forbidden for {context}: {msg}"
+    if r.status_code == 404:
+        return False, f"Repository not found. Please check the format is 'owner/repo' (e.g. facebook/react)."
+    if r.status_code == 401:
+        return False, f"GitHub token is invalid or expired. Please update your token in Settings."
+    if r.status_code >= 400:
+        try:
+            msg = r.json().get('message', r.text[:200])
+        except Exception:
+            msg = r.text[:200]
+        return False, f"GitHub API error ({r.status_code}): {msg}"
+    return True, None
+
 def fetch_github_runs(repo, token):
-    # Fetch workflow runs
+    """Fetch workflow runs. Returns (steps_list, error_string_or_None)."""
     url = f"https://api.github.com/repos/{repo}/actions/runs"
     headers = {}
     if token:
         headers["Authorization"] = f"token {token}"
 
-    r = requests.get(url, headers=headers)
-    data = r.json()
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException as e:
+        return [], f"Network error connecting to GitHub: {e}"
 
+    ok, err = _check_github_response(r, f"workflow runs for {repo}")
+    if not ok:
+        return [], err
+
+    data = r.json()
     workflow_runs = data.get('workflow_runs', [])
     if not workflow_runs:
-        return []
+        return [], f"No CI/CD workflow runs found for '{repo}'. Make sure the repository has GitHub Actions configured."
 
     # Get the latest run ID
     latest_run = workflow_runs[0]
@@ -22,7 +50,15 @@ def fetch_github_runs(repo, token):
 
     # Fetch jobs for the latest run
     jobs_url = f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs"
-    r_jobs = requests.get(jobs_url, headers=headers)
+    try:
+        r_jobs = requests.get(jobs_url, headers=headers, timeout=15)
+    except requests.RequestException as e:
+        return [], f"Network error fetching job details: {e}"
+
+    ok, err = _check_github_response(r_jobs, "workflow jobs")
+    if not ok:
+        return [], err
+
     jobs_data = r_jobs.json()
 
     steps = []
@@ -52,7 +88,7 @@ def fetch_github_runs(repo, token):
             'time': duration_ms # time is in seconds
         })
 
-    return steps
+    return steps, None
 
 def fetch_repository_dependencies(repo, token):
     headers = {}
@@ -61,19 +97,28 @@ def fetch_repository_dependencies(repo, token):
         
     # Try package.json
     url = f"https://api.github.com/repos/{repo}/contents/package.json"
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        data = r.json()
-        if 'content' in data:
-            return base64.b64decode(data['content']).decode('utf-8')
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        ok, err = _check_github_response(r, 'dependencies')
+        if not ok and r.status_code == 403:
+            return None  # Rate limited, skip silently for non-critical data
+        if r.status_code == 200:
+            data = r.json()
+            if 'content' in data:
+                return base64.b64decode(data['content']).decode('utf-8')
+    except requests.RequestException:
+        pass
             
     # Try requirements.txt
     url = f"https://api.github.com/repos/{repo}/contents/requirements.txt"
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        data = r.json()
-        if 'content' in data:
-            return base64.b64decode(data['content']).decode('utf-8')
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            if 'content' in data:
+                return base64.b64decode(data['content']).decode('utf-8')
+    except requests.RequestException:
+        pass
             
     return None
 
@@ -84,7 +129,10 @@ def fetch_dora_metrics(repo, token):
         headers["Authorization"] = f"token {token}"
         
     url = f"https://api.github.com/repos/{repo}/pulls?state=closed&per_page=15"
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return None
     if r.status_code != 200:
         return None
         
@@ -112,8 +160,11 @@ def fetch_docs_freshness(repo, token):
     readme_url = f"https://api.github.com/repos/{repo}/commits?path=README.md&per_page=1"
     code_url = f"https://api.github.com/repos/{repo}/commits?per_page=1"
     
-    r_readme = requests.get(readme_url, headers=headers)
-    r_code = requests.get(code_url, headers=headers)
+    try:
+        r_readme = requests.get(readme_url, headers=headers, timeout=15)
+        r_code = requests.get(code_url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return None
     
     if r_readme.status_code == 200 and r_code.status_code == 200:
         readme_data = r_readme.json()
@@ -151,7 +202,10 @@ def fetch_docs_freshness_full(repo, token):
 
     # Get latest code commit date
     code_url = f"https://api.github.com/repos/{repo}/commits?per_page=1"
-    r_code = requests.get(code_url, headers=headers)
+    try:
+        r_code = requests.get(code_url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return None
     if r_code.status_code != 200 or not r_code.json():
         return None
 
@@ -165,7 +219,15 @@ def fetch_docs_freshness_full(repo, token):
     for doc in doc_files:
         max_score += doc['weight']
         commit_url = f"https://api.github.com/repos/{repo}/commits?path={doc['path']}&per_page=1"
-        r = requests.get(commit_url, headers=headers)
+        try:
+            r = requests.get(commit_url, headers=headers, timeout=15)
+        except requests.RequestException:
+            results.append({
+                'file': doc['path'], 'label': doc['label'], 'exists': False,
+                'drift_days': None, 'last_updated': None,
+                'severity': 'MISSING', 'points': 0, 'max_points': doc['weight']
+            })
+            continue
 
         if r.status_code == 200 and r.json():
             doc_date_str = r.json()[0]['commit']['committer']['date']
@@ -232,7 +294,10 @@ def fetch_flaky_tests(repo, token):
         headers["Authorization"] = f"token {token}"
     
     url = f"https://api.github.com/repos/{repo}/actions/runs?per_page=10"
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return []
     if r.status_code != 200:
         return []
     
@@ -246,7 +311,10 @@ def fetch_flaky_tests(repo, token):
     for run in runs[:10]:
         run_id = run['id']
         jobs_url = f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs"
-        r_jobs = requests.get(jobs_url, headers=headers)
+        try:
+            r_jobs = requests.get(jobs_url, headers=headers, timeout=15)
+        except requests.RequestException:
+            continue
         if r_jobs.status_code != 200:
             continue
         
@@ -285,7 +353,10 @@ def fetch_security_scan(repo, token):
     
     # Fetch list of workflow files
     url = f"https://api.github.com/repos/{repo}/contents/.github/workflows"
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return None
     if r.status_code != 200:
         return None
     
@@ -293,9 +364,12 @@ def fetch_security_scan(repo, token):
     combined_yaml = ""
     for f in files:
         if f['name'].endswith(('.yml', '.yaml')):
-            file_r = requests.get(f['download_url'], headers=headers)
-            if file_r.status_code == 200:
-                combined_yaml += f"\n# --- {f['name']} ---\n" + file_r.text
+            try:
+                file_r = requests.get(f['download_url'], headers=headers, timeout=15)
+                if file_r.status_code == 200:
+                    combined_yaml += f"\n# --- {f['name']} ---\n" + file_r.text
+            except requests.RequestException:
+                continue
     
     return combined_yaml if combined_yaml else None
 
@@ -307,7 +381,10 @@ def fetch_code_structure(repo, token):
     
     # Get the default branch's tree recursively
     url = f"https://api.github.com/repos/{repo}/git/trees/HEAD?recursive=1"
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return None
     if r.status_code != 200:
         return None
     
@@ -343,7 +420,10 @@ def fetch_pr_details(repo, token):
         headers["Authorization"] = f"token {token}"
     
     url = f"https://api.github.com/repos/{repo}/pulls?state=closed&per_page=20"
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return []
     if r.status_code != 200:
         return []
     
@@ -354,7 +434,10 @@ def fetch_pr_details(repo, token):
         pr_num = pr['number']
         # Fetch individual PR for additions/deletions/changed_files
         detail_url = f"https://api.github.com/repos/{repo}/pulls/{pr_num}"
-        dr = requests.get(detail_url, headers=headers)
+        try:
+            dr = requests.get(detail_url, headers=headers, timeout=15)
+        except requests.RequestException:
+            continue
         if dr.status_code != 200:
             continue
         
@@ -397,12 +480,18 @@ def fetch_onboarding_files(repo, token):
     found = {}
     for fname in files_to_check:
         url = f"https://api.github.com/repos/{repo}/contents/{fname}"
-        r = requests.get(url, headers=headers)
-        found[fname] = r.status_code == 200
+        try:
+            r = requests.get(url, headers=headers, timeout=15)
+            found[fname] = r.status_code == 200
+        except requests.RequestException:
+            found[fname] = False
     
     # Check if README has a "Getting Started" section
     readme_url = f"https://api.github.com/repos/{repo}/contents/README.md"
-    r = requests.get(readme_url, headers=headers)
+    try:
+        r = requests.get(readme_url, headers=headers, timeout=15)
+    except requests.RequestException:
+        r = type('obj', (object,), {'status_code': 0})()
     has_getting_started = False
     if r.status_code == 200:
         content = base64.b64decode(r.json().get('content', '')).decode('utf-8', errors='ignore').lower()
@@ -418,7 +507,10 @@ def fetch_commit_patterns(repo, token):
         headers["Authorization"] = f"token {token}"
     
     url = f"https://api.github.com/repos/{repo}/commits?per_page=100"
-    r = requests.get(url, headers=headers)
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+    except requests.RequestException:
+        return []
     if r.status_code != 200:
         return []
     
@@ -466,22 +558,32 @@ def fetch_env_files(repo, token):
     
     for fname in list(files_to_fetch.keys()):
         url = f"https://api.github.com/repos/{repo}/contents/{fname}"
-        r = requests.get(url, headers=headers)
-        if r.status_code == 200:
-            data = r.json()
-            if 'content' in data:
-                files_to_fetch[fname] = base64.b64decode(data['content']).decode('utf-8', errors='ignore')
+        try:
+            r = requests.get(url, headers=headers, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                if 'content' in data:
+                    files_to_fetch[fname] = base64.b64decode(data['content']).decode('utf-8', errors='ignore')
+        except requests.RequestException:
+            continue
     
     # Also grab workflow YAML for version cross-referencing
     wf_url = f"https://api.github.com/repos/{repo}/contents/.github/workflows"
-    r = requests.get(wf_url, headers=headers)
+    try:
+        r = requests.get(wf_url, headers=headers, timeout=15)
+    except requests.RequestException:
+        files_to_fetch['_workflows'] = None
+        return files_to_fetch
     workflow_content = ""
     if r.status_code == 200:
         for f in r.json():
             if f['name'].endswith(('.yml', '.yaml')):
-                fr = requests.get(f['download_url'], headers=headers)
-                if fr.status_code == 200:
-                    workflow_content += fr.text + "\n"
+                try:
+                    fr = requests.get(f['download_url'], headers=headers, timeout=15)
+                    if fr.status_code == 200:
+                        workflow_content += fr.text + "\n"
+                except requests.RequestException:
+                    continue
     files_to_fetch['_workflows'] = workflow_content if workflow_content else None
     
     return files_to_fetch
