@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integration Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-color: #0f172a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1rem;
+            margin: 0;
+        }
+
+        .auth-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 2rem;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-family: inherit;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        .links {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .links a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            font-size: 0.9rem;
+        }
+        
+        .success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-size: 0.9rem;
+        }
+        
+        .desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="auth-card">
+        <h2>⚙️ Connected Integrations</h2>
+        
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+            <div class="success">{{ success }}</div>
+        {% endif %}
+        
+        <form method="post">
+            <div class="form-group">
+                <label>GitHub Personal Access Token</label>
+                <input type="password" name="github_token" value="{{ current_user.github_token or '' }}" placeholder="ghp_xxxx..." >
+                <span class="desc">Save your GitHub token securely so you never have to type it again when pulling down repositories. Required for private repos.</span>
+            </div>
+            
+            <div class="form-group" style="margin-top: 2rem;">
+                <label>Gemini AI API Key</label>
+                <input type="password" name="gemini_api_key" value="{{ current_user.gemini_api_key or '' }}" placeholder="AIzaSy...">
+                <span class="desc">Connects your pipeline outputs directly to Google Gemini 1.5 Flash to automatically discover structural bottlenecks and get advanced optimization suggestions. If left blank, limits AI to the simulated proxy loop.</span>
+            </div>
+
+            <button type="submit" style="margin-top: 1rem;">Save Integrations</button>
+        </form>
+
+        <div class="links">
+            <a href="/">← Return to Dashboard</a>
+        </div>
+    </div>
+
+</body>
+</html>

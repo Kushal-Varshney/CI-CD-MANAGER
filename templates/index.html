@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DX-Ray — DevSecOps Diagnostic Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --bg-color: #0a0e1a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --card-bg: rgba(15, 23, 42, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --accent: #a855f7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+            z-index: -2;
+            animation: bgPulse 8s ease-in-out infinite alternate;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: -1;
+            animation: gridShift 20s linear infinite;
+        }
+
+        @keyframes bgPulse {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes gridShift {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(60px, 60px); }
+        }
+
+        /* Layout */
+        .page-wrapper {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 220px;
+            height: 100vh;
+            background: rgba(10, 14, 26, 0.95);
+            border-right: 1px solid var(--card-border);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-brand {
+            padding: 0 1.25rem 1.25rem;
+            border-bottom: 1px solid var(--card-border);
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-brand h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #818cf8, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .sidebar-brand span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .nav-section {
+            padding: 0 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-section-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            padding: 0.5rem 0.5rem 0.25rem;
+            opacity: 0.6;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.55rem 0.75rem;
+            border-radius: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: all 0.25s ease;
+            margin-bottom: 2px;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--text-main);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .nav-link.active {
+            color: var(--text-main);
+            background: rgba(99, 102, 241, 0.15);
+        }
+
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            background: var(--primary);
+            border-radius: 0 4px 4px 0;
+        }
+
+        .nav-link .nav-icon {
+            width: 18px;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .nav-link .track-badge {
+            margin-left: auto;
+            font-size: 0.6rem;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--primary);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 220px;
+            flex: 1;
+            padding: 2rem 2.5rem;
+            max-width: 960px;
+        }
+
+        /* Header */
+        .page-header {
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .page-header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #818cf8, #c084fc, #f0abfc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.3rem;
+            animation: titleGlow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            0% { filter: brightness(1); }
+            100% { filter: brightness(1.2); }
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .header-actions {
+            display: flex; gap: 0.75rem; margin-top: 1rem;
+        }
+
+        .header-actions a {
+            text-decoration: none;
+            padding: 0.45rem 1rem;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            transition: all 0.25s;
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+        }
+
+        .header-actions a:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.06);
+        }
+
+        .header-actions a.primary {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .header-actions a.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: cardEnter 0.5s ease-out both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99, 102, 241, 0.2);
+            box-shadow: 0 20px 60px -15px rgba(99, 102, 241, 0.15), 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .card:hover::before { opacity: 1; }
+
+        @keyframes cardEnter {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.2s; }
+        .card:nth-child(4) { animation-delay: 0.3s; }
+
+        .card h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; padding: 1rem; }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        /* Form styling */
+        .form-group { margin-bottom: 1.25rem; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="file"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(10, 14, 26, 0.8);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 0 20px rgba(99, 102, 241, 0.1);
+        }
+
+        input[type="file"]::file-selector-button {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            margin-right: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: var(--primary-hover);
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button[type="submit"]::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(
+                transparent, 
+                rgba(255, 255, 255, 0.05), 
+                transparent
+            );
+            transform: rotate(45deg);
+            transition: all 0.5s;
+        }
+
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+
+        button[type="submit"]:hover::after {
+            left: 100%;
+        }
+
+        button[type="submit"]:active { transform: translateY(1px); }
+
+        /* Results */
+        .results { animation: fadeIn 0.6s ease-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(10, 14, 26, 0.5);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(99, 102, 241, 0.2);
+            background: rgba(99, 102, 241, 0.04);
+        }
+
+        .stat-card h3 {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .score-good {
+            color: var(--success);
+            font-weight: 700;
+            font-size: 2.5rem;
+            text-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+        }
+
+        .score-bad {
+            color: var(--danger);
+            font-weight: 700;
+            font-size: 2.5rem;
+            text-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+        }
+
+        .text-danger { color: var(--danger); font-weight: bold; }
+        .text-success { color: var(--success); font-weight: bold; }
+
+        .suggestions {
+            background: rgba(10, 14, 26, 0.5);
+            border-left: 3px solid var(--primary);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .suggestions h3 {
+            font-size: 1.05rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .suggestions ul {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .suggestions li {
+            color: #cbd5e1;
+            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            background: rgba(10, 14, 26, 0.5);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid var(--card-border);
+        }
+
+        /* Scan status indicator */
+        .scan-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--success);
+            margin-top: 0.5rem;
+        }
+
+        .scan-status .pulse {
+            width: 8px; height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+
+        /* Print styles */
+        @media screen { .print-only { display: none !important; } }
+        @media print {
+            .print-hide { display: none !important; }
+            .print-only { display: block !important; }
+            canvas { display: none !important; }
+            body, html { background: white !important; color: black !important; }
+            .sidebar { display: none !important; }
+            .main-content { margin-left: 0 !important; }
+            .container { max-width: 100% !important; width: 100% !important; }
+            h1, h2, h3, p, div, span, li, b { 
+                color: black !important; -webkit-text-fill-color: black !important;
+                background-clip: unset !important; -webkit-background-clip: unset !important;
+                text-shadow: none !important;
+            }
+            .card, .stat-card, .suggestions, .chart-container { 
+                background: transparent !important; box-shadow: none !important;
+                filter: none !important; border: 1px solid #ccc !important;
+            }
+            .stat-card, .suggestions { page-break-inside: avoid !important; break-inside: avoid !important; }
+            .stats-grid { display: flex !important; flex-wrap: wrap !important; gap: 10px !important; }
+            .stat-card { flex: 1 1 45% !important; }
+            .print-page-break { page-break-before: always !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-wrapper">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar print-hide">
+        <div class="sidebar-brand">
+            <h2>⚡ DX-Ray</h2>
+            <span>Diagnostic Platform</span>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Diagnostic Modules</div>
+            <a href="/" class="nav-link active">
+                <span class="nav-icon">🏠</span> Build & CI Scanner
+                <span class="track-badge">A</span>
+            </a>
+            <a href="/repo-health" class="nav-link">
+                <span class="nav-icon">📊</span> Full X-Ray
+                <span class="track-badge">ALL</span>
+            </a>
+            <a href="/coverage-scan" class="nav-link">
+                <span class="nav-icon">🔍</span> Test Health X-Ray
+                <span class="track-badge">B</span>
+            </a>
+            <a href="/docs-freshness" class="nav-link">
+                <span class="nav-icon">📝</span> Docs Freshness
+                <span class="track-badge">C</span>
+            </a>
+            <a href="/pr-analysis" class="nav-link">
+                <span class="nav-icon">📐</span> Code Review Radar
+                <span class="track-badge">G</span>
+            </a>
+            <a href="/onboarding" class="nav-link">
+                <span class="nav-icon">🚀</span> Onboarding Scan
+                <span class="track-badge">D</span>
+            </a>
+            <a href="/commit-patterns" class="nav-link">
+                <span class="nav-icon">📈</span> Developer Flow
+                <span class="track-badge">F</span>
+            </a>
+            <a href="/env-check" class="nav-link">
+                <span class="nav-icon">🐳</span> Env Integrity
+                <span class="track-badge">H</span>
+            </a>
+        </div>
+        
+        <div class="nav-section" style="margin-top: auto;">
+            <div class="nav-section-title">Workspace</div>
+            <a href="/projects" class="nav-link">
+                <span class="nav-icon">📁</span> Projects
+            </a>
+            <a href="/history" class="nav-link">
+                <span class="nav-icon">🕐</span> History
+            </a>
+            <a href="/settings" class="nav-link">
+                <span class="nav-icon">⚙️</span> Settings
+            </a>
+            <a href="/logout" class="nav-link" style="color: var(--danger);">
+                <span class="nav-icon">🚪</span> Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+    <div class="container" style="gap: 1.5rem;">
+
+    {% if is_historical %}
+    <div class="page-header">
+        <h1>Pipeline Record: {{target_name}}</h1>
+        <p>Executed on {{run_date}}</p>
+        <div class="header-actions">
+            <a href="/" class="primary">← Back to live dashboard</a>
+        </div>
+    </div>
+    {% else %}
+    <div class="page-header print-hide">
+        <h1>DX-Ray: Build & CI Scanner</h1>
+        <p>X-ray your CI/CD pipelines. Expose hidden friction. Build the fix.</p>
+        <div class="scan-status">
+            <div class="pulse"></div>
+            Ready to scan — supports GitHub, GitLab, CI logs
+        </div>
+    </div>
+
+    <div class="grid-2 print-hide" style="margin-bottom: 1rem;">
+        <div class="card">
+            <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Upload CI Log
+            </h2>
+            <form method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Select your pipeline log file (.txt or .log)</label>
+                    <input type="file" name="logfile" required>
+                </div>
+                <button type="submit">🔬 Analyze Log</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                Scan Repository
+            </h2>
+            <form method="post">
+                <div class="form-group">
+                    <label>Repository (owner/repo)</label>
+                    <input type="text" name="repo" placeholder="e.g. facebook/react" required>
+                </div>
+                <div class="form-group">
+                    <label>Access Token</label>
+                    <input type="password" name="token" placeholder="{% if current_user.github_token %}Using saved token from Settings...{% else %}Optional for public repos{% endif %}">
+                </div>
+                <button type="submit">⚡ Run X-Ray Scan</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if steps %}
+    <div class="card results">
+        <h2>Analysis Results</h2>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Time</h3>
+                <div class="stat-value">{{total}}s</div>
+            </div>
+            <div class="stat-card">
+                <h3>Pipeline Health</h3>
+                <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    {% if score >= 80 %}
+                        <span style="font-size: 1.5rem;">🟢</span> <span class="score-good">Healthy</span>
+                    {% elif score >= 50 %}
+                        <span style="font-size: 1.5rem;">🟡</span> <span style="color: var(--warning);">Needs Improvement</span>
+                    {% else %}
+                        <span style="font-size: 1.5rem;">🔴</span> <span class="score-bad">Critical</span>
+                    {% endif %}
+                </div>
+                <div style="margin-top: 5px; color: var(--text-muted); font-size: 0.9rem;">Score: {{score}}/100</div>
+            </div>
+            <div class="stat-card">
+                <h3>Top Bottleneck</h3>
+                <div class="stat-value" style="font-size:1.25rem">{{slowest.step}}</div>
+                <div style="margin-top: 5px; color: var(--warning); font-size: 0.9rem;">Consuming {{slowest.percent|default(0)}}% of pipeline time</div>
+            </div>
+            
+            {% if metrics and metrics.dora_avg %}
+            <div class="stat-card">
+                <h3>Lead Time to Merge</h3>
+                <div class="stat-value" style="font-size:1.5rem">{{ metrics.dora_avg }} hrs</div>
+                <div style="margin-top: 5px; color: var(--text-muted); font-size: 0.9rem;">DORA Team Velocity</div>
+            </div>
+            {% endif %}
+            
+            {% if metrics and metrics.docs_drift %}
+            <div class="stat-card">
+                <h3>Docs Freshness</h3>
+                <div class="stat-value" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    {% if metrics.docs_drift > 30 %}
+                        <span style="font-size: 1.5rem;">🔴</span> <span class="score-bad">Stale</span>
+                    {% else %}
+                        <span style="font-size: 1.5rem;">🟢</span> <span class="score-good">Fresh</span>
+                    {% endif %}
+                </div>
+                <div style="margin-top: 5px; color: var(--text-muted); font-size: 0.9rem;">{{metrics.docs_drift}} days of drift</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if previous_time != None %}
+        <div class="suggestions" style="border-left-color: var(--primary); margin-bottom: 2rem;">
+            <h3>🔄 Run Comparison</h3>
+            <ul style="gap: 0.5rem; padding-left: 0;">
+                <li style="padding-left: 0;"><span style="margin-right: 5px;">⏱️</span> <b>Previous run:</b> &nbsp;{{previous_time}} sec</li>
+                <li style="padding-left: 0;"><span style="margin-right: 5px;">⚡</span> <b>Current run:</b> &nbsp;{{total}} sec</li>
+                <li style="padding-left: 0;"><span style="margin-right: 5px;">📈</span> <b>Improvement:</b> &nbsp;
+                    <span class="{% if improvement > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {% if improvement > 0 %}{% endif %}{{improvement}}%
+                    </span>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if score_explain %}
+        <div class="suggestions" style="border-left-color: var(--warning); margin-bottom: 2rem;">
+            <h3>📊 CI Efficiency Score Explanation</h3>
+            <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Score dropped due to:</p>
+            <ul style="gap: 0.5rem; padding-left: 0;">
+            {% for reason in score_explain %}
+                <li style="padding-left: 0;">
+                    <span style="margin-right: 8px;">✨</span> 
+                    {{reason}}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if failure_analysis %}
+        <div class="suggestions" style="border-left-color: var(--danger); margin-bottom: 2rem;">
+            <h3>🔥 Failure Analysis</h3>
+            <ul style="gap: 0.5rem; padding-left: 0;">
+            {% for item in failure_analysis %}
+                <li style="padding-left: 0;">
+                    <span style="margin-right: 8px;">✨</span> 
+                    {{item}}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if ai_suggestions %}
+        <div class="suggestions" style="border-left-color: #818cf8; margin-bottom: 2rem;">
+            <h3>🤖 AI Insights</h3>
+            <ul>
+            {% for s in ai_suggestions %}
+                <li><span style="color:#818cf8; margin-right: 8px;">✦</span> {{s}}</li>
+            {% endfor %}
+            </ul>
+            {% if metrics and metrics.auto_fix_yaml %}
+            <div style="margin-top: 15px; margin-left: 20px;">
+                <a href="/download-fix/{{run_id}}" style="display: inline-block; padding: 0.6rem 1.2rem; background: #818cf8; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; transition: background 0.2s;">
+                    🛠️ Download Optimized Pipeline (.yml)
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if dep_analysis %}
+        <div class="suggestions" style="border-left-color: var(--danger); margin-bottom: 2rem;">
+            <h3>🛡️ Supply Chain Radar</h3>
+            <ul>
+            {% for warning in dep_analysis %}
+                <li><span style="color:var(--danger); margin-right: 8px;">✦</span> {{warning}}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if flaky_tests %}
+        <div class="suggestions" style="border-left-color: #f59e0b; margin-bottom: 2rem;">
+            <h3>🧪 Test Health X-Ray (Flaky Detection)</h3>
+            <p style="color: var(--text-muted); margin-bottom: 0.8rem; font-size: 0.9rem;">Jobs detected with intermittent pass/fail across last 10 workflow runs:</p>
+            <ul>
+            {% for t in flaky_tests %}
+                <li>
+                    <span style="color: {% if t.flakiness >= 50 %}var(--danger){% else %}var(--warning){% endif %}; margin-right: 8px;">✦</span>
+                    <b>{{ t.step }}</b> — <span style="color: {% if t.flakiness >= 50 %}var(--danger){% else %}var(--warning){% endif %}; font-weight: 600;">{{ t.flakiness }}% flaky</span>
+                    <span style="color: var(--text-muted);"> (failed {{ t.fail_count }}/{{ t.total }} runs)</span>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if security_findings %}
+        <div class="suggestions" style="border-left-color: #ef4444; margin-bottom: 2rem;">
+            <h3>🔐 CI Security Scanner</h3>
+            <p style="color: var(--text-muted); margin-bottom: 0.8rem; font-size: 0.9rem;">Scanning workflow YAML configurations for dangerous CI/CD patterns:</p>
+            <ul>
+            {% for finding in security_findings %}
+                <li>
+                    <span style="color: {% if 'CRITICAL' in finding %}var(--danger){% elif 'WARNING' in finding %}var(--warning){% else %}var(--success){% endif %}; margin-right: 8px;">✦</span>
+                    {{ finding }}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if cost_estimate %}
+        <div class="suggestions" style="border-left-color: #a78bfa; margin-bottom: 2rem;">
+            <h3>💸 CI Cost Estimator</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 0.5rem;">
+                <div style="background: rgba(167,139,250,0.1); padding: 1rem; border-radius: 10px; text-align: center;">
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Per Run</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #a78bfa;">${{ cost_estimate.per_run }}</div>
+                </div>
+                <div style="background: rgba(167,139,250,0.1); padding: 1rem; border-radius: 10px; text-align: center;">
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Monthly ({{ cost_estimate.runs_per_day }}/day)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: {% if cost_estimate.monthly > 50 %}var(--danger){% elif cost_estimate.monthly > 10 %}var(--warning){% else %}var(--success){% endif %};">${{ cost_estimate.monthly }}</div>
+                </div>
+                <div style="background: rgba(167,139,250,0.1); padding: 1rem; border-radius: 10px; text-align: center;">
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">Runner Minutes</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #e2e8f0;">{{ cost_estimate.total_minutes }} min</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if failure_predictions %}
+        <div class="suggestions" style="border-left-color: #f43f5e; margin-bottom: 2rem;">
+            <h3>📉 Failure Prediction Engine</h3>
+            <p style="color: var(--text-muted); margin-bottom: 0.8rem; font-size: 0.9rem;">Statistical risk analysis based on historical run data:</p>
+            <ul>
+            {% for p in failure_predictions %}
+                <li>
+                    <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-right: 8px;
+                        background: {% if p.level == 'HIGH' %}rgba(239,68,68,0.2); color: var(--danger){% elif p.level == 'MEDIUM' %}rgba(245,158,11,0.2); color: var(--warning){% else %}rgba(16,185,129,0.2); color: var(--success){% endif %};">
+                        {{ p.level }}
+                    </span>
+                    <b>{{ p.step }}</b> — {{ p.risk_percent }}% failure probability
+                    <span style="color: var(--text-muted);"> (failed {{ p.failed }}/{{ p.total }} historical runs)</span>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="suggestions">
+            <h3>Actionable Suggestions</h3>
+            <ul>
+            {% for s in suggestions %}
+                <li>{{s}}</li>
+            {% endfor %}
+            </ul>
+        </div>
+
+        <div class="print-page-break">
+            <h3 style="margin-bottom: 1rem; color: #e2e8f0;" class="print-hide">Execution Times</h3>
+            <h3 style="margin-bottom: 1rem; display: none;" class="print-only">Execution Times (Continued)</h3>
+            <div class="chart-container" style="margin-bottom: 2rem;">
+                <canvas id="chart"></canvas>
+            </div>
+
+            {% if trend_labels|length > 1 %}
+            <h3 style="margin-bottom: 1rem; color: #e2e8f0;" class="print-hide">Health Score Trend (Last {{trend_labels|length}} runs)</h3>
+            <h3 style="margin-bottom: 1rem; display: none;" class="print-only">Health Score Trend (Last {{trend_labels|length}} runs)</h3>
+            <div class="chart-container">
+                <canvas id="trend-chart"></canvas>
+            </div>
+            {% endif %}
+        </div>
+
+        <script id="chart-data" type="application/json">
+        {
+            "labels": {{ steps|map(attribute='step')|list|tojson }},
+            "values": {{ steps|map(attribute='time')|list|tojson }}
+        }
+        </script>
+        
+        <script id="trend-data" type="application/json">
+        {
+            "labels": {{ trend_labels|default([])|tojson }},
+            "values": {{ trend_scores|default([])|tojson }}
+        }
+        </script>
+
+        <script>
+        // Print Handler for Canvases
+        function preparePrint() {
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+                let img = canvas.nextElementSibling;
+                if (!img || !img.classList.contains('print-img')) {
+                    img = document.createElement('img');
+                    img.className = 'print-img print-only';
+                    canvas.parentNode.insertBefore(img, canvas.nextSibling);
+                }
+                // Save current canvas frame to Image
+                img.src = canvas.toDataURL('image/png', 1.0);
+            });
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        }
+
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        
+        const chartDataElem = document.getElementById('chart-data');
+        if (chartDataElem) {
+            const cData = JSON.parse(chartDataElem.textContent);
+            new Chart(document.getElementById('chart'), {
+                type: 'bar',
+                data: {
+                    labels: cData.labels,
+                    datasets: [{
+                        label: 'Execution Time (seconds)',
+                        data: cData.values,
+                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    hoverBackgroundColor: 'rgba(129, 140, 248, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)',
+                            drawBorder: false
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+        }
+
+        const trendDataElem = document.getElementById('trend-data');
+        if (trendDataElem) {
+            const tData = JSON.parse(trendDataElem.textContent);
+            
+            if (tData.labels.length > 1) {
+                new Chart(document.getElementById('trend-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: tData.labels,
+                        datasets: [{
+                            label: 'Health Score',
+                            data: tData.values,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#cbd5e1',
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+        }
+        </script>
+    </div>
+    {% endif %}
+
+</div>
+</main>
+</div>
+
+</body>
+</html>

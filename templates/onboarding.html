@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DX-Ray — Onboarding Diagnostic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #6366f1; --accent: #a855f7; --bg-color: #0a0e1a; --text-main: #f8fafc; --text-muted: #94a3b8; --card-bg: rgba(15,23,42,0.6); --card-border: rgba(255,255,255,0.08); --success: #10b981; --warning: #f59e0b; --danger: #ef4444; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-color); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
+        body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.06) 0%, transparent 50%); z-index: -2; }
+        body::after { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px); background-size: 60px 60px; z-index: -1; animation: gridShift 20s linear infinite; }
+        @keyframes gridShift { 0% { transform: translate(0,0); } 100% { transform: translate(60px,60px); } }
+        .page-wrapper { display: flex; min-height: 100vh; }
+        .sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: rgba(10,14,26,0.95); border-right: 1px solid var(--card-border); backdrop-filter: blur(20px); padding: 1.5rem 0; z-index: 100; display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar-brand { padding: 0 1.25rem 1.25rem; border-bottom: 1px solid var(--card-border); margin-bottom: 1rem; }
+        .sidebar-brand h2 { font-size: 1.3rem; font-weight: 700; background: linear-gradient(135deg, #818cf8, #a855f7); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .sidebar-brand span { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
+        .nav-section { padding: 0 0.75rem; margin-bottom: 0.5rem; }
+        .nav-section-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0.5rem 0.5rem 0.25rem; opacity: 0.6; }
+        .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem; border-radius: 8px; color: var(--text-muted); text-decoration: none; font-size: 0.82rem; font-weight: 500; transition: all 0.25s; margin-bottom: 2px; position: relative; }
+        .nav-link:hover { color: var(--text-main); background: rgba(99,102,241,0.08); }
+        .nav-link.active { color: var(--text-main); background: rgba(99,102,241,0.15); }
+        .nav-link.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 60%; background: var(--primary); border-radius: 0 4px 4px 0; }
+        .nav-link .nav-icon { width: 18px; text-align: center; font-size: 0.95rem; }
+        .nav-link .track-badge { margin-left: auto; font-size: 0.6rem; background: rgba(99,102,241,0.15); color: var(--primary); padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+        .main-content { margin-left: 220px; flex: 1; padding: 2rem 2.5rem; max-width: 960px; }
+        @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 1rem; } }
+        .page-header { margin-bottom: 2rem; }
+        .page-header h1 { font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, #818cf8, #c084fc, #f0abfc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.3rem; }
+        .page-header p { color: var(--text-muted); font-size: 0.95rem; }
+        .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 2rem; backdrop-filter: blur(20px); box-shadow: 0 4px 30px rgba(0,0,0,0.3); transition: all 0.4s cubic-bezier(0.4,0,0.2,1); margin-bottom: 1.5rem; position: relative; overflow: hidden; animation: cardEnter 0.5s ease-out both; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent); opacity: 0; transition: opacity 0.4s; }
+        .card:hover { transform: translateY(-3px); border-color: rgba(99,102,241,0.2); box-shadow: 0 20px 60px -15px rgba(99,102,241,0.15); }
+        .card:hover::before { opacity: 1; }
+        @keyframes cardEnter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        h2 { color: #e2e8f0; margin-bottom: 1rem; }
+        input[type="text"] { width: 100%; padding: 0.8rem 1rem; border-radius: 10px; border: 1px solid var(--card-border); background: rgba(10,14,26,0.8); color: var(--text-main); font-size: 0.95rem; margin-bottom: 1rem; font-family: inherit; transition: all 0.3s; }
+        input[type="text"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+        button { padding: 0.8rem 2rem; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; font-weight: 600; cursor: pointer; font-size: 0.95rem; transition: all 0.3s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99,102,241,0.3); }
+        .grade-display { text-align: center; margin: 1.5rem 0; }
+        .grade-circle { display: inline-flex; align-items: center; justify-content: center; width: 100px; height: 100px; border-radius: 50%; font-size: 2.5rem; font-weight: 700; }
+        .grade-A { background: rgba(16,185,129,0.15); color: var(--success); border: 3px solid var(--success); }
+        .grade-B { background: rgba(99,102,241,0.15); color: var(--primary); border: 3px solid var(--primary); }
+        .grade-C { background: rgba(245,158,11,0.15); color: var(--warning); border: 3px solid var(--warning); }
+        .grade-D, .grade-F { background: rgba(239,68,68,0.15); color: var(--danger); border: 3px solid var(--danger); }
+        .check-row { display: flex; justify-content: space-between; align-items: center; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 0.3rem; }
+        .check-row.pass { background: rgba(16,185,129,0.06); }
+        .check-row.fail { background: rgba(239,68,68,0.06); }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+    <aside class="sidebar">
+        <div class="sidebar-brand"><h2>⚡ DX-Ray</h2><span>Diagnostic Platform</span></div>
+        <div class="nav-section">
+            <div class="nav-section-title">Diagnostic Modules</div>
+            <a href="/" class="nav-link"><span class="nav-icon">🏠</span> Build & CI Scanner <span class="track-badge">A</span></a>
+            <a href="/repo-health" class="nav-link"><span class="nav-icon">📊</span> Full X-Ray <span class="track-badge">ALL</span></a>
+            <a href="/coverage-scan" class="nav-link"><span class="nav-icon">🔍</span> Test Health X-Ray <span class="track-badge">B</span></a>
+            <a href="/docs-freshness" class="nav-link"><span class="nav-icon">📝</span> Docs Freshness <span class="track-badge">C</span></a>
+            <a href="/pr-analysis" class="nav-link"><span class="nav-icon">📐</span> Code Review Radar <span class="track-badge">G</span></a>
+            <a href="/onboarding" class="nav-link active"><span class="nav-icon">🚀</span> Onboarding Scan <span class="track-badge">D</span></a>
+            <a href="/commit-patterns" class="nav-link"><span class="nav-icon">📈</span> Developer Flow <span class="track-badge">F</span></a>
+            <a href="/env-check" class="nav-link"><span class="nav-icon">🐳</span> Env Integrity <span class="track-badge">H</span></a>
+        </div>
+        <div class="nav-section" style="margin-top: auto;">
+            <div class="nav-section-title">Workspace</div>
+            <a href="/projects" class="nav-link"><span class="nav-icon">📁</span> Projects</a>
+            <a href="/history" class="nav-link"><span class="nav-icon">🕐</span> History</a>
+            <a href="/settings" class="nav-link"><span class="nav-icon">⚙️</span> Settings</a>
+            <a href="/logout" class="nav-link" style="color: var(--danger);"><span class="nav-icon">🚪</span> Logout</a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+    <div class="page-header">
+        <h1>🚀 DX-Ray: Onboarding Diagnostic</h1>
+        <p>Measure new-developer experience. How easy is it to make a first commit?</p>
+    </div>
+
+    <div class="card">
+        <form method="post">
+            <input type="text" name="repo" placeholder="owner/repo (e.g. facebook/react)" required value="{{ repo or '' }}">
+            <button type="submit">⚡ Check Onboarding Readiness</button>
+        </form>
+    </div>
+
+    {% if result %}
+    <div class="card">
+        <h2>Onboarding Score — {{ repo }}</h2>
+        <div class="grade-display">
+            <div class="grade-circle grade-{{ result.grade }}">{{ result.grade }}</div>
+            <div style="margin-top: 0.5rem; color: var(--text-muted);">{{ result.score }}/100</div>
+        </div>
+        {% for check in result.checks %}
+        <div class="check-row {% if check.exists %}pass{% else %}fail{% endif %}">
+            <div><span style="font-size:1.1rem; margin-right:0.5rem;">{% if check.exists %}✅{% else %}❌{% endif %}</span><strong>{{ check.file }}</strong><span style="color:var(--text-muted); margin-left:0.5rem; font-size:0.85rem;">{{ check.label }}</span></div>
+            <span style="color:var(--text-muted); font-size:0.8rem;">+{{ check.points }} pts</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    </main>
+</div>
+</body>
+</html>

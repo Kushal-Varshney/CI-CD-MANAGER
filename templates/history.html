@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DX-Ray — Scan History</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #6366f1; --accent: #a855f7; --bg-color: #0a0e1a; --text-main: #f8fafc; --text-muted: #94a3b8; --card-bg: rgba(15,23,42,0.6); --card-border: rgba(255,255,255,0.08); --success: #10b981; --warning: #f59e0b; --danger: #ef4444; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-color); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
+        body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.06) 0%, transparent 50%); z-index: -2; }
+        body::after { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px); background-size: 60px 60px; z-index: -1; animation: gridShift 20s linear infinite; }
+        @keyframes gridShift { 0% { transform: translate(0,0); } 100% { transform: translate(60px,60px); } }
+        @keyframes cardEnter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideRight { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Layout */
+        .page-wrapper { display: flex; min-height: 100vh; }
+        .sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: rgba(10,14,26,0.95); border-right: 1px solid var(--card-border); backdrop-filter: blur(20px); padding: 1.5rem 0; z-index: 100; display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar-brand { padding: 0 1.25rem 1.25rem; border-bottom: 1px solid var(--card-border); margin-bottom: 1rem; }
+        .sidebar-brand h2 { font-size: 1.3rem; font-weight: 700; background: linear-gradient(135deg, #818cf8, #a855f7); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .sidebar-brand span { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
+        .nav-section { padding: 0 0.75rem; margin-bottom: 0.5rem; }
+        .nav-section-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0.5rem 0.5rem 0.25rem; opacity: 0.6; }
+        .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem; border-radius: 8px; color: var(--text-muted); text-decoration: none; font-size: 0.82rem; font-weight: 500; transition: all 0.25s; margin-bottom: 2px; position: relative; }
+        .nav-link:hover { color: var(--text-main); background: rgba(99,102,241,0.08); }
+        .nav-link.active { color: var(--text-main); background: rgba(99,102,241,0.15); }
+        .nav-link.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 60%; background: var(--primary); border-radius: 0 4px 4px 0; }
+        .nav-link .nav-icon { width: 18px; text-align: center; font-size: 0.95rem; }
+        .nav-link .track-badge { margin-left: auto; font-size: 0.6rem; background: rgba(99,102,241,0.15); color: var(--primary); padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+        .main-content { margin-left: 220px; flex: 1; padding: 2rem 2.5rem; max-width: 1000px; }
+        @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 1rem; } }
+
+        /* Top Bar */
+        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; animation: fadeIn 0.4s ease; }
+        .back-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 10px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); color: var(--primary); text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.3s; }
+        .back-btn:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); transform: translateX(-3px); }
+        .back-btn svg { width: 16px; height: 16px; transition: transform 0.3s; }
+        .back-btn:hover svg { transform: translateX(-3px); }
+        .top-actions { display: flex; gap: 0.6rem; }
+        .action-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.8rem; font-weight: 500; text-decoration: none; transition: all 0.3s; border: 1px solid; cursor: pointer; }
+        .action-btn.print { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); color: var(--warning); }
+        .action-btn.print:hover { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.4); }
+
+        /* Page Header */
+        .page-header { margin-bottom: 2rem; animation: slideRight 0.5s ease; }
+        .page-header .subtitle { font-size: 0.85rem; color: var(--accent); font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.3rem; }
+        .page-header h1 { font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, #818cf8, #c084fc, #f0abfc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.3rem; line-height: 1.2; }
+        .page-header .project-name { font-size: 1.1rem; color: var(--text-muted); word-break: break-all; }
+
+        /* Card */
+        .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 2rem; backdrop-filter: blur(20px); box-shadow: 0 4px 30px rgba(0,0,0,0.3); transition: all 0.4s cubic-bezier(0.4,0,0.2,1); margin-bottom: 1.5rem; position: relative; overflow: hidden; animation: cardEnter 0.5s ease-out both; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent); opacity: 0; transition: opacity 0.4s; }
+        .card:hover::before { opacity: 1; }
+
+        /* Filter Pills */
+        .card-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem; }
+        .card-toolbar h2 { font-size: 1.15rem; color: #e2e8f0; font-weight: 600; }
+        .filter-group { display: flex; gap: 0.3rem; background: rgba(10,14,26,0.5); border-radius: 10px; padding: 3px; border: 1px solid var(--card-border); }
+        .filter-pill { padding: 0.35rem 0.85rem; border-radius: 8px; font-size: 0.78rem; font-weight: 500; color: var(--text-muted); text-decoration: none; transition: all 0.25s; border: none; cursor: pointer; background: transparent; }
+        .filter-pill:hover { color: var(--text-main); background: rgba(99,102,241,0.08); }
+        .filter-pill.active { color: white; background: var(--primary); box-shadow: 0 2px 8px rgba(99,102,241,0.3); }
+
+        /* Table */
+        table { width: 100%; text-align: left; border-collapse: collapse; }
+        th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 1rem 0; border-bottom: 1px solid rgba(99,102,241,0.15); }
+        td { padding: 0.85rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9rem; }
+        tr.data-row { cursor: pointer; transition: all 0.3s ease; border-radius: 8px; }
+        tr.data-row:hover { background: rgba(99,102,241,0.06); }
+        tr.data-row:hover td:first-child { color: var(--primary); }
+        tr.data-row td:first-child { position: relative; padding-left: 0.5rem; }
+        tr.data-row:hover td:first-child::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 70%; background: var(--primary); border-radius: 2px; }
+
+        /* Score Badges */
+        .score-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 42px; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+        .score-badge.high { background: rgba(16,185,129,0.12); color: var(--success); }
+        .score-badge.medium { background: rgba(245,158,11,0.12); color: var(--warning); }
+        .score-badge.low { background: rgba(239,68,68,0.12); color: var(--danger); }
+
+        /* Source Tag */
+        .source-tag { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: rgba(99,102,241,0.1); color: var(--primary); border: 1px solid rgba(99,102,241,0.15); }
+
+        /* Arrow indicator on row hover */
+        .row-arrow { opacity: 0; color: var(--primary); transition: all 0.3s; font-size: 0.85rem; }
+        tr.data-row:hover .row-arrow { opacity: 1; transform: translateX(3px); }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 3rem 1rem; }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+        .empty-state p { color: var(--text-muted); font-size: 0.95rem; }
+        .empty-state a { display: inline-block; margin-top: 1rem; padding: 0.6rem 1.5rem; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.3s; }
+        .empty-state a:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99,102,241,0.3); }
+
+        /* Run count badge */
+        .run-count { display: inline-flex; align-items: center; justify-content: center; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; background: rgba(99,102,241,0.1); color: var(--primary); margin-left: 0.5rem; }
+
+        /* Print */
+        @media print {
+            .print-hide { display: none !important; }
+            body, html { background: white !important; color: black !important; margin: 0 !important; padding: 0 !important; }
+            body::before, body::after { display: none !important; }
+            .sidebar { display: none !important; }
+            .main-content { margin-left: 0 !important; max-width: 100% !important; padding: 1.5rem !important; }
+            .card { background: transparent !important; border: none !important; padding: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
+            .page-header h1, h2, th, td, span, b { background: none !important; color: black !important; -webkit-text-fill-color: black !important; }
+            th { border-bottom: 2px solid #000 !important; }
+            td { border-bottom: 1px solid #ccc !important; }
+            tr.data-row:hover { background: none !important; }
+            tr.data-row td:first-child::before { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+    <aside class="sidebar print-hide">
+        <div class="sidebar-brand"><h2>⚡ DX-Ray</h2><span>Diagnostic Platform</span></div>
+        <div class="nav-section">
+            <div class="nav-section-title">Diagnostic Modules</div>
+            <a href="/" class="nav-link"><span class="nav-icon">🏠</span> Build & CI Scanner <span class="track-badge">A</span></a>
+            <a href="/repo-health" class="nav-link"><span class="nav-icon">📊</span> Full X-Ray <span class="track-badge">ALL</span></a>
+            <a href="/coverage-scan" class="nav-link"><span class="nav-icon">🔍</span> Test Health X-Ray <span class="track-badge">B</span></a>
+            <a href="/docs-freshness" class="nav-link"><span class="nav-icon">📝</span> Docs Freshness <span class="track-badge">C</span></a>
+            <a href="/pr-analysis" class="nav-link"><span class="nav-icon">📐</span> Code Review Radar <span class="track-badge">G</span></a>
+            <a href="/onboarding" class="nav-link"><span class="nav-icon">🚀</span> Onboarding Scan <span class="track-badge">D</span></a>
+            <a href="/commit-patterns" class="nav-link"><span class="nav-icon">📈</span> Developer Flow <span class="track-badge">F</span></a>
+            <a href="/env-check" class="nav-link"><span class="nav-icon">🐳</span> Env Integrity <span class="track-badge">H</span></a>
+        </div>
+        <div class="nav-section" style="margin-top: auto;">
+            <div class="nav-section-title">Workspace</div>
+            <a href="/projects" class="nav-link"><span class="nav-icon">📁</span> Projects</a>
+            <a href="/history" class="nav-link active"><span class="nav-icon">🕐</span> History</a>
+            <a href="/settings" class="nav-link"><span class="nav-icon">⚙️</span> Settings</a>
+            <a href="/logout" class="nav-link" style="color: var(--danger);"><span class="nav-icon">🚪</span> Logout</a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+
+    <!-- Top bar with back button (top-left) and actions -->
+    <div class="top-bar print-hide">
+        <a href="/projects" class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            Back to Projects
+        </a>
+        <div class="top-actions">
+            <a href="javascript:window.print()" class="action-btn print">🖨️ Print Trend</a>
+        </div>
+    </div>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        {% if project_name %}
+        <div class="subtitle">History for</div>
+        <h1>{{ project_name }}</h1>
+        {% else %}
+        <div class="subtitle">DX-Ray Workspace</div>
+        <h1>🕐 Scan History</h1>
+        <p class="project-name">All diagnostic scans across your projects</p>
+        {% endif %}
+    </div>
+
+    <!-- Card with table -->
+    <div class="card">
+        <div class="card-toolbar">
+            <h2>Previous Runs <span class="run-count">{{ runs|length }}</span></h2>
+            <div class="filter-group print-hide">
+                {% if project_name %}
+                <a href="/history?project={{ project_name }}&limit=5" class="filter-pill {% if current_limit == 5 %}active{% endif %}">Last 5</a>
+                <a href="/history?project={{ project_name }}&limit=10" class="filter-pill {% if current_limit == 10 %}active{% endif %}">Last 10</a>
+                <a href="/history?project={{ project_name }}" class="filter-pill {% if current_limit == None %}active{% endif %}">All</a>
+                {% else %}
+                <a href="/history?limit=5" class="filter-pill {% if current_limit == 5 %}active{% endif %}">Last 5</a>
+                <a href="/history?limit=10" class="filter-pill {% if current_limit == 10 %}active{% endif %}">Last 10</a>
+                <a href="/history" class="filter-pill {% if current_limit == None %}active{% endif %}">All</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if runs %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Source</th>
+                    <th>Target</th>
+                    <th>Score</th>
+                    <th>Duration</th>
+                    <th class="print-hide"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in runs %}
+                <tr class="data-row" onclick="window.location.href='/run/{{r.id}}'" style="animation: cardEnter 0.4s ease-out {{ loop.index * 0.05 }}s both;">
+                    <td>{{ r.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><span class="source-tag">{{ r.source }}</span></td>
+                    <td style="font-weight: 500;">{{ r.name }}</td>
+                    <td><span class="score-badge {% if r.score >= 80 %}high{% elif r.score >= 50 %}medium{% else %}low{% endif %}">{{ r.score }}</span></td>
+                    <td style="color: var(--text-muted);">{{ r.total_time }}s</td>
+                    <td class="print-hide"><span class="row-arrow">→</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">📭</div>
+            <p>No scan history found yet.</p>
+            <p style="font-size: 0.85rem; margin-top: 0.3rem;">Run a diagnostic scan to start building your history.</p>
+            <a href="/">⚡ Run Your First Scan</a>
+        </div>
+        {% endif %}
+    </div>
+
+    </main>
+</div>
+</body>
+</html>
